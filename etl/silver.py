@@ -4,6 +4,8 @@ import argparse
 import gc
 import pandas as pd
 import awswrangler as wr
+
+wr.engine.set("python")
 # Configuración del logger
 import sys
 import logging
