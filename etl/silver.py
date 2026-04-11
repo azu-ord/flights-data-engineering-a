@@ -185,6 +185,7 @@ if __name__ == "__main__":
         assert df_daily[["year", "month", "day"]].notna().all().all(), "df_daily tiene nulos en columnas clave (year, month, day)"
         assert (df_daily["total_flights"] > 0).all(), "df_daily tiene filas con total_flights <= 0"
         assert (df_daily["total_cancelled"] >= 0).all(), "df_daily tiene valores negativos en total_cancelled"
+        wr.catalog.delete_table_if_exists(database=DATABASE_NAME, table=TABLE_NAME_DAILY)
         #createCatalogTable(df_daily, BUCKET_NAME=bucket_name, TABLE_NAME=TABLE_NAME_DAILY, DATABASE_NAME=DATABASE_NAME)
         writer(df_daily, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_DAILY, partition_cols=["month"])
         del df_daily; gc.collect()
@@ -194,6 +195,7 @@ if __name__ == "__main__":
         assert df_monthly[["month", "airline"]].notna().all().all(), "df_monthly tiene nulos en columnas clave (month, airline)"
         assert (df_monthly["total_flights"] > 0).all(), "df_monthly tiene filas con total_flights <= 0"
         assert df_monthly["on_time_pct"].between(0, 100).all(), "df_monthly tiene on_time_pct fuera de rango [0, 100]"
+        wr.catalog.delete_table_if_exists(database=DATABASE_NAME, table=TABLE_NAME_MONTHLY)
         #createCatalogTable(df_monthly, BUCKET_NAME=bucket_name, TABLE_NAME=TABLE_NAME_MONTHLY, DATABASE_NAME=DATABASE_NAME, partition_cols=["month"])
         writer(df_monthly, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_MONTHLY, partition_cols=[])
         del df_monthly; gc.collect()
@@ -203,6 +205,7 @@ if __name__ == "__main__":
         assert df_flights_by_airport["origin_airport"].notna().all(), "df_flights_by_airport tiene nulos en origin_airport"
         assert (df_flights_by_airport["total_departures"] > 0).all(), "df_flights_by_airport tiene filas con total_departures <= 0"
         assert df_flights_by_airport["weather_delay_pct"].between(0, 100).all(), "df_flights_by_airport tiene weather_delay_pct fuera de rango [0, 100]"
+        wr.catalog.delete_table_if_exists(database=DATABASE_NAME, table=TABLE_NAME_FLIGHTS_BY_AIRPORT)
         #createCatalogTable(df_flights_by_airport, BUCKET_NAME=bucket_name, TABLE_NAME=TABLE_NAME_FLIGHTS_BY_AIRPORT, DATABASE_NAME=DATABASE_NAME, partition_cols=["month"])
         writer(df_flights_by_airport, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_FLIGHTS_BY_AIRPORT, partition_cols=[])
         del df_flights_by_airport; gc.collect()
