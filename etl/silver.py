@@ -112,7 +112,8 @@ def transformFlightsByAirport(df: pd.DataFrame) -> pd.DataFrame:
             total_delayed=("DEPARTURE_DELAY", lambda x: (x > 0).sum()),
             total_cancelled=("CANCELLED", "sum"),
             avg_departure_delay=("DEPARTURE_DELAY", "mean"),
-            #pct_weather_delay= () #  porcentaje del total de minutos de retraso atribuidos a clima
+            #  porcentaje del total de minutos de retraso atribuidos a clima
+            weather_delay_pct=("WEATHER_DELAY", lambda x: x.sum() / df["WEATHER_DELAY"].sum() * 100 if df["WEATHER_DELAY"].sum() > 0 else 0)
         )
         .reset_index()
     )
