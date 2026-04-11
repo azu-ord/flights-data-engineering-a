@@ -93,7 +93,7 @@ def monthly_transform(df: pd.DataFrame) -> pd.DataFrame:
             total_delayed=("DEPARTURE_DELAY", lambda x: (x > 0).sum()),
             total_cancelled=("CANCELLED", "sum"),
             avg_arrival_delay=("ARRIVAL_DELAY", "mean"),
-            on_time_pct = ("ARRIVAL_DELAY", lambda x: (x <= 15).mean() * 100) # porcentaje de vuelos con ARRIVAL_DELAY <= 15
+            on_time_pct=("ARRIVAL_DELAY", lambda x: (x.dropna() <= 15).mean() * 100) # porcentaje de vuelos con ARRIVAL_DELAY <= 15
         )
         .reset_index()
     )
@@ -101,7 +101,7 @@ def monthly_transform(df: pd.DataFrame) -> pd.DataFrame:
     logger.info("Transformación completada: agrupado por MONTH y AIRLINE.")
     return df_monthly
 
-def transformFlightsByAirport(df: pd.DataFrame) -> pd.DataFrame:
+def transform_flights_by_airport(df: pd.DataFrame) -> pd.DataFrame:
     """ Transforma el dataframe para obtener métricas por aeropuerto de origen.
     Args:
         df (pd.DataFrame): Dataframe de vuelos en bruto.
@@ -124,7 +124,7 @@ def transformFlightsByAirport(df: pd.DataFrame) -> pd.DataFrame:
     logger.info("Transformación completada: agrupado por ORIGIN_AIRPORT y MONTH.")
     return df_flights_by_airport
 
-def createCatalogTable(df: pd.DataFrame, TABLE_NAME: str, DATABASE_NAME: str, partition_cols: list[str] = ["MONTH"]):
+def createCatalogTable(df: pd.DataFrame,BUCKET_NAME: str, TABLE_NAME: str, DATABASE_NAME: str, partition_cols: list[str] = ["MONTH"]):
 
     logger.info("── CREATING CATALOG TABLE ──────────────────────────────────")
     wr.catalog.create_parquet_table(
@@ -142,7 +142,7 @@ def writer(df: pd.DataFrame, BUCKET_NAME: str , DATABASE_NAME: str, TABLE_NAME: 
     output_path = f"s3://{BUCKET_NAME}/flights/silver/{TABLE_NAME}/"
     wr.s3.to_parquet(
         df=df, 
-        output_path=output_path, 
+        path=output_path, 
         dataset=True,
         database=DATABASE_NAME,
         table=TABLE_NAME,
@@ -171,16 +171,28 @@ if __name__ == "__main__":
         df_bronze = reader(BUCKET_NAME=bucket_name, table="flights")
 
         df_daily = daily_transform(df_bronze)
-        createCatalogTable(df_daily, TABLE_NAME=TABLE_NAME_DAILY, DATABASE_NAME=DATABASE_NAME)
+        assert not df_daily.empty, "df_daily está vacío"
+        assert df_daily[["YEAR", "MONTH", "DAY"]].notna().all().all(), "df_daily tiene nulos en columnas clave (YEAR, MONTH, DAY)"
+        assert (df_daily["total_flights"] > 0).all(), "df_daily tiene filas con total_flights <= 0"
+        assert (df_daily["total_cancelled"] >= 0).all(), "df_daily tiene valores negativos en total_cancelled"
+        #createCatalogTable(df_daily, BUCKET_NAME=bucket_name, TABLE_NAME=TABLE_NAME_DAILY, DATABASE_NAME=DATABASE_NAME)
         writer(df_daily, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_DAILY, partition_cols=["MONTH"])
 
         df_monthly = monthly_transform(df_bronze)
-        createCatalogTable(df_monthly, TABLE_NAME=TABLE_NAME_MONTHLY, DATABASE_NAME=DATABASE_NAME, partition_cols=["MONTH"])
-        writer(df_monthly, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_MONTHLY)
+        assert not df_monthly.empty, "df_monthly está vacío"
+        assert df_monthly[["MONTH", "AIRLINE"]].notna().all().all(), "df_monthly tiene nulos en columnas clave (MONTH, AIRLINE)"
+        assert (df_monthly["total_flights"] > 0).all(), "df_monthly tiene filas con total_flights <= 0"
+        assert df_monthly["on_time_pct"].between(0, 100).all(), "df_monthly tiene on_time_pct fuera de rango [0, 100]"
+        #createCatalogTable(df_monthly, BUCKET_NAME=bucket_name, TABLE_NAME=TABLE_NAME_MONTHLY, DATABASE_NAME=DATABASE_NAME, partition_cols=["MONTH"])
+        writer(df_monthly, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_MONTHLY, partition_cols=[])
 
-        df_flights_by_airport = transformFlightsByAirport(df_bronze)
-        createCatalogTable(df_flights_by_airport, TABLE_NAME=TABLE_NAME_FLIGHTS_BY_AIRPORT, DATABASE_NAME=DATABASE_NAME, partition_cols=["MONTH"])
-        writer(df_flights_by_airport, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_FLIGHTS_BY_AIRPORT)
+        df_flights_by_airport = transform_flights_by_airport(df_bronze)
+        assert not df_flights_by_airport.empty, "df_flights_by_airport está vacío"
+        assert df_flights_by_airport["ORIGIN_AIRPORT"].notna().all(), "df_flights_by_airport tiene nulos en ORIGIN_AIRPORT"
+        assert (df_flights_by_airport["total_departures"] > 0).all(), "df_flights_by_airport tiene filas con total_departures <= 0"
+        assert df_flights_by_airport["weather_delay_pct"].between(0, 100).all(), "df_flights_by_airport tiene weather_delay_pct fuera de rango [0, 100]"
+        #createCatalogTable(df_flights_by_airport, BUCKET_NAME=bucket_name, TABLE_NAME=TABLE_NAME_FLIGHTS_BY_AIRPORT, DATABASE_NAME=DATABASE_NAME, partition_cols=["MONTH"])
+        writer(df_flights_by_airport, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_FLIGHTS_BY_AIRPORT, partition_cols=[])
 
         logger.info("ETL Silver completado exitosamente.")
 
