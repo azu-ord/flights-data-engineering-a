@@ -101,7 +101,7 @@ if __name__ == "__main__":
     try:
 
         bucket_name = args.bucket
-        build_with_ctas(BUCKET_NAME=bucket_name)
+        build_with_ctas(BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME)
     except Exception as e:
         logger.error(f"Error durante la creación de la tabla Gold: {e}")
         sys.exit(1)
