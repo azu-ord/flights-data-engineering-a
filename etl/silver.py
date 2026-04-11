@@ -1,8 +1,5 @@
 # etl/silver.py
 
-import os
-os.environ["WR_RAY_ENABLED"] = "0"
-
 import argparse
 import pandas as pd
 import awswrangler as wr
@@ -39,7 +36,7 @@ def reader(BUCKET_NAME: str, table: str) -> pd.DataFrame:
     """
     s3_path = f"s3://{BUCKET_NAME}/flights/bronze/{table}/"
     logger.info("── READING ──────────────────────────────────")
-    df = wr.s3.read_parquet(s3_path)
+    df = pd.read_parquet(s3_path)
     logger.info(f"Dataframe leído desde {s3_path} con {len(df)} filas.")
     return df
 
