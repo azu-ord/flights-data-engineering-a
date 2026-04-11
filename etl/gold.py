@@ -82,7 +82,7 @@ def build_with_ctas(BUCKET_NAME: str, DATABASE_NAME: str, TABLE_NAME: str) -> No
         query_ctas,
         database      = DATABASE_NAME,
         ctas_approach = False,
-        s3_output     = f"s3://{BUCKET_NAME}/athena-results/",
+        s3_output     = f"s3://{BUCKET_NAME}/flights/gold/",
     )
     logger.info("✓ Gold table 'vuelos_analitica' creada con éxito.")
 
