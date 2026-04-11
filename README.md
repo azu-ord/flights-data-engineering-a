@@ -66,3 +66,69 @@ python etl/bronze.py --bucket $S3_BUCKET --data-dir $DATA_DIR
 - AWS CLI configurado
 - Python 3.8+
 - Librerías: `pandas`, `awswrangler`
+
+---
+
+### 3. ETL - Capa Silver
+
+La capa Silver transforma los datos crudos de Bronze en métricas agregadas y limpias.
+
+**Descripción:**
+- **Transform**: Genera tres tablas analíticas a partir de `flights_bronze.flights`
+- **Validate**: Aplica asserts antes de escribir para garantizar integridad de los datos
+- **Load**: Escribe las tablas como Parquet en S3 y las registra en Glue Catalog (`flights_silver`)
+
+**Tablas generadas:**
+- `flights_daily` — métricas por año/mes/día: vuelos totales, retrasados, cancelados y delays promedio (excluye cancelados)
+- `flights_monthly` — métricas por mes/aerolínea: totales, delays y porcentaje on-time
+- `flights_by_airport` — métricas por aeropuerto de origen: salidas, delays y porcentaje de retraso por clima
+
+**Ejecución:**
+
+```bash
+python etl/silver.py --bucket <tu-bucket>
+```
+
+**Argumentos:**
+- `--bucket`: Nombre del bucket S3 (puede incluir prefijo, ej. `mi-bucket/etl`)
+
+---
+
+### 4. ETL - Capa Gold
+
+La capa Gold construye una tabla analítica enriquecida en Athena cruzando vuelos con aerolíneas y aeropuertos.
+
+**Descripción:**
+- **CTAS**: Ejecuta un `CREATE TABLE AS SELECT` en Athena sobre las tablas de `flights_bronze`
+- Enriquece cada vuelo con el nombre completo de la aerolínea, nombre y ubicación del aeropuerto de origen y destino
+- Registra la tabla resultante en Glue Catalog bajo `flights_gold`
+
+**Tabla generada:**
+- `vuelos_analitica` — tabla desnormalizada con columnas de vuelos + aerolínea + aeropuertos (origen y destino)
+
+**Columnas principales:**
+
+| Columna | Descripción |
+|---|---|
+| `year`, `month`, `day` | Fecha del vuelo |
+| `origin_airport` / `destination_airport` | Código IATA |
+| `origin_airport_name`, `origin_city`, `origin_state` | Datos del aeropuerto de origen |
+| `destination_airport_name` | Nombre del aeropuerto de destino |
+| `airline_name` | Nombre completo de la aerolínea |
+| `departure_delay`, `arrival_delay` | Minutos de retraso |
+| `cancelled`, `cancellation_reason` | Estado de cancelación |
+| `distance` | Distancia del vuelo en millas |
+| `air_system_delay`, `airline_delay`, `weather_delay`, `late_aircraft_delay`, `security_delay` | Desglose de causas de retraso |
+
+**Prerequisitos:**
+- Las capas Bronze y Silver deben haberse ejecutado previamente
+- El bucket debe contener los datos de `flights_bronze` registrados en Glue Catalog
+
+**Ejecución:**
+
+```bash
+python etl/gold.py --bucket <tu-bucket>
+```
+
+**Argumentos:**
+- `--bucket`: Nombre del bucket S3 donde están los datos Bronze
