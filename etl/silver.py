@@ -1,24 +1,51 @@
 # etl/silver.py
 
+import argparse
 import pandas as pd
 import awswrangler as wr
 # Configuración del logger
+import sys
 import logging
+
+# ──────────────────────────────────────────────
+# Configuración del logger
+# ──────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
+# ──────────────────────────────────────────────
+# Constantes
+# ──────────────────────────────────────────────
 INPUT_PATH = "s3://flights-data-engineering-a/silver/flights/"
+DATABASE_NAME = "flights_silver"
+TABLE_NAME_DAILY = "flights_daily"
+TABLE_NAME_MONTHLY = "flights_monthly"
+TABLE_NAME_FLIGHTS_BY_AIRPORT = "flights_by_airport"
 
-# lee un datafram que se guardo en s s3 con wr para agruparlo por año y mes, y luego lo guarda en otro path de s3
+
+# ──────────────────────────────────────────────
+# Data Engineering: Silver Layer
+# ──────────────────────────────────────────────
+
 def reader():
+    """Lee el dataframe desde S3 usando awswrangler.
+    Returns:
+        pd.DataFrame: Dataframe leído desde S3.
+    """
     df = wr.s3.read_parquet(INPUT_PATH)
     logger.info(f"Dataframe leído desde {INPUT_PATH} con {len(df)} filas.")
     return df
 
-def transform(df: pd.DataFrame) -> pd.DataFrame:
+def daily_transform(df: pd.DataFrame) -> pd.DataFrame:
+    """Transforma el dataframe para obtener métricas diarias de vuelos.
+    Args:
+        df (pd.DataFrame): Dataframe de vuelos en bruto.
+    Returns:
+        pd.DataFrame: Dataframe transformado con métricas diarias.
+    """
     # vuelos totales
     df_all = df
     # vuelos no cancelado
@@ -44,28 +71,102 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     )
     
     # Combinar ambas agregaciones con un self join
-    df_gold = df_silver.join(delays_non_cancelled, how="left").reset_index()
+    df_daily = df_silver.join(delays_non_cancelled, how="left").reset_index()
     
     logger.info("Transformación completada: agrupado por YEAR, MONTH y DAY (delays excluyen cancelados).")
-    return df_gold
+    return df_daily
 
-# Particiona por MONTH. Usa partition_cols=["MONTH"] y mode="overwrite_partitions". Escribe a s3://<tu-bucket>/flights/silver/flights_daily/.
-def writer(df: pd.DataFrame):
+def monthly_transform(df: pd.DataFrame) -> pd.DataFrame:
+    """Transforma el dataframe para obtener métricas mensuales de vuelos.
+    Args:
+        df (pd.DataFrame): Dataframe de vuelos en bruto.
+    Returns:
+        pd.DataFrame: Dataframe transformado con métricas mensuales.
+    """
+    df_monthly = (
+        df.groupby(["MONTH","AIRLINE"])
+        .agg(
+            total_flights=("FLIGHT_NUMBER", "count"),
+            total_delayed=("DEPARTURE_DELAY", lambda x: (x > 0).sum()),
+            total_cancelled=("CANCELLED", "sum"),
+            avg_arrival_delay=("ARRIVAL_DELAY", "mean"),
+            on_time_pct = ("ARRIVAL_DELAY", lambda x: (x <= 15).mean() * 100) # porcentaje de vuelos con ARRIVAL_DELAY <= 15
+        )
+        .reset_index()
+    )
+    
+    logger.info("Transformación completada: agrupado por MONTH y AIRLINE.")
+    return df_monthly
+
+def transformFlightsByAirport(df: pd.DataFrame) -> pd.DataFrame:
+    """ Transforma el dataframe para obtener métricas por aeropuerto de origen.
+    Args:
+        df (pd.DataFrame): Dataframe de vuelos en bruto.
+    Returns:
+        pd.DataFrame: Dataframe transformado con métricas por aeropuerto de origen.
+    """
+    df_flights_by_airport = (
+        df.groupby(["ORIGIN_AIRPORT"])
+        .agg(
+            total_departures=("FLIGHT_NUMBER", "count"),
+            total_delayed=("DEPARTURE_DELAY", lambda x: (x > 0).sum()),
+            total_cancelled=("CANCELLED", "sum"),
+            avg_departure_delay=("DEPARTURE_DELAY", "mean"),
+            #pct_weather_delay= () #  porcentaje del total de minutos de retraso atribuidos a clima
+        )
+        .reset_index()
+    )
+    logger.info("Transformación completada: agrupado por ORIGIN_AIRPORT y MONTH.")
+    return df_flights_by_airport
+
+def createCatalogTable(df: pd.DataFrame, TABLE_NAME: str, DATABASE_NAME: str):
+    wr.catalog.create_parquet_table(
+        database=DATABASE_NAME,
+        table=TABLE_NAME,
+        path=f"s3://{BUCKET_NAME}/flights/silver/{TABLE_NAME}/",
+        columns_types={col: str(dtype) for col, dtype in df.dtypes.items()},
+        partition_cols=["MONTH"],
+    )
+    logger.info(f"Tabla '{TABLE_NAME}' creada en Glue Catalog bajo la base de datos '{DATABASE_NAME}'.")
+
+def writer(df: pd.DataFrame, BUCKET_NAME: str , DATABASE_NAME: str, TABLE_NAME: str, partition_cols: list[str] = ["MONTH"]):
+    """ Escribe el dataframe transformado en S3 en formato Parquet"""
     output_path = f"s3://{BUCKET_NAME}/flights/silver/{TABLE_NAME}/"
     wr.s3.to_parquet(
         df=df, 
         output_path=output_path, 
         dataset=True,
-        database=TABLE_NAME,
+        database=DATABASE_NAME,
+        table=TABLE_NAME,
         index=False,
-        partition_cols=["MONTH"],
+        partition_cols=partition_cols,
         mode="overwrite"
         )
     logger.info(f"Dataframe transformado guardado en {output_path}.")
 
-
-
+# ──────────────────────────────────────────────
+# Main
+# ──────────────────────────────────────────────
 if __name__ == "__main__":
-    df_bronze = reader()
-    df_silver = transform(df_bronze)
-    writer(df_silver)
+    args = parse_args()
+    try:
+        df_bronze = reader()
+        bucket_name = args.bucket
+
+        df_daily = daily_transform(df_bronze)
+        createCatalogTable(df_daily, TABLE_NAME=TABLE_NAME_DAILY, DATABASE_NAME=DATABASE_NAME)
+        writer(df_daily, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_DAILY, partition_cols=["MONTH"])
+
+        df_monthly = monthly_transform(df_bronze)
+        createCatalogTable(df_monthly, TABLE_NAME=TABLE_NAME_MONTHLY, DATABASE_NAME=DATABASE_NAME, partition_cols=["MONTH"])
+        writer(df_monthly, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_MONTHLY)
+
+        df_flights_by_airport = transformFlightsByAirport(df_bronze)
+        createCatalogTable(df_flights_by_airport, TABLE_NAME=TABLE_NAME_FLIGHTS_BY_AIRPORT, DATABASE_NAME=DATABASE_NAME, partition_cols=["MONTH"])
+        writer(df_flights_by_airport, BUCKET_NAME=bucket_name, DATABASE_NAME=DATABASE_NAME, TABLE_NAME=TABLE_NAME_FLIGHTS_BY_AIRPORT)
+
+        logger.info("ETL Silver completado exitosamente.")
+
+    except Exception as e:
+        logger.error(f"Error occurred: {e}")
+        sys.exit(1)
