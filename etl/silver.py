@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────
 # Constantes
 # ──────────────────────────────────────────────
-INPUT_PATH = "s3://flights-data-engineering-a/silver/flights/"
 DATABASE_NAME = "flights_silver"
 TABLE_NAME_DAILY = "flights_daily"
 TABLE_NAME_MONTHLY = "flights_monthly"
@@ -30,13 +29,15 @@ TABLE_NAME_FLIGHTS_BY_AIRPORT = "flights_by_airport"
 # Data Engineering: Silver Layer
 # ──────────────────────────────────────────────
 
-def reader():
-    """Lee el dataframe desde S3 usando awswrangler.
+def reader(BUCKET_NAME: str, table: str) -> pd.DataFrame:
+    """Lee el dataframe desde S3 usando awswrangler. flights_bronze.flights
     Returns:
         pd.DataFrame: Dataframe leído desde S3.
     """
-    df = wr.s3.read_parquet(INPUT_PATH)
-    logger.info(f"Dataframe leído desde {INPUT_PATH} con {len(df)} filas.")
+    s3_path = f"s3://{BUCKET_NAME}/flights/bronze/{table}/"
+    logger.info("── READING ──────────────────────────────────")
+    df = wr.s3.read_parquet(s3_path)
+    logger.info(f"Dataframe leído desde {s3_path} con {len(df)} filas.")
     return df
 
 def daily_transform(df: pd.DataFrame) -> pd.DataFrame:
@@ -46,6 +47,7 @@ def daily_transform(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Dataframe transformado con métricas diarias.
     """
+    logger.info("── DAILY TRANSFORM ──────────────────────────────────")
     # vuelos totales
     df_all = df
     # vuelos no cancelado
@@ -83,6 +85,7 @@ def monthly_transform(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Dataframe transformado con métricas mensuales.
     """
+    logger.info("── MONTHLY TRANSFORM ──────────────────────────────────")
     df_monthly = (
         df.groupby(["MONTH","AIRLINE"])
         .agg(
@@ -105,6 +108,7 @@ def transformFlightsByAirport(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Dataframe transformado con métricas por aeropuerto de origen.
     """
+    logger.info("── FLIGHTS BY AIRPORT ──────────────────────────────────")
     df_flights_by_airport = (
         df.groupby(["ORIGIN_AIRPORT"])
         .agg(
@@ -120,18 +124,21 @@ def transformFlightsByAirport(df: pd.DataFrame) -> pd.DataFrame:
     logger.info("Transformación completada: agrupado por ORIGIN_AIRPORT y MONTH.")
     return df_flights_by_airport
 
-def createCatalogTable(df: pd.DataFrame, TABLE_NAME: str, DATABASE_NAME: str):
+def createCatalogTable(df: pd.DataFrame, TABLE_NAME: str, DATABASE_NAME: str, partition_cols: list[str] = ["MONTH"]):
+
+    logger.info("── CREATING CATALOG TABLE ──────────────────────────────────")
     wr.catalog.create_parquet_table(
         database=DATABASE_NAME,
         table=TABLE_NAME,
         path=f"s3://{BUCKET_NAME}/flights/silver/{TABLE_NAME}/",
         columns_types={col: str(dtype) for col, dtype in df.dtypes.items()},
-        partition_cols=["MONTH"],
+        partition_cols=partition_cols,
     )
     logger.info(f"Tabla '{TABLE_NAME}' creada en Glue Catalog bajo la base de datos '{DATABASE_NAME}'.")
 
 def writer(df: pd.DataFrame, BUCKET_NAME: str , DATABASE_NAME: str, TABLE_NAME: str, partition_cols: list[str] = ["MONTH"]):
     """ Escribe el dataframe transformado en S3 en formato Parquet"""
+    logger.info("── WRITING ──────────────────────────────────")
     output_path = f"s3://{BUCKET_NAME}/flights/silver/{TABLE_NAME}/"
     wr.s3.to_parquet(
         df=df, 
@@ -158,8 +165,10 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     try:
-        df_bronze = reader()
+        
         bucket_name = args.bucket
+
+        df_bronze = reader(BUCKET_NAME=bucket_name, table="flights_bronze")
 
         df_daily = daily_transform(df_bronze)
         createCatalogTable(df_daily, TABLE_NAME=TABLE_NAME_DAILY, DATABASE_NAME=DATABASE_NAME)
