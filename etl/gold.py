@@ -45,7 +45,9 @@ def build_with_ctas(BUCKET_NAME: str, DATABASE_NAME: str, TABLE_NAME: str) -> No
     """
     logger.info("── BUILDING GOLD TABLE WITH CTAS ──────────────────────────────────")
     query_ctas = f"""
-    CREATE TABLE {DATABASE_NAME}.{TABLE_NAME} AS (
+    CREATE TABLE {DATABASE_NAME}.{TABLE_NAME}
+    WITH (external_location = 's3://{BUCKET_NAME}/flights/gold/{TABLE_NAME}/')
+    AS (
         SELECT
             f.year,
             f.month,
@@ -78,6 +80,7 @@ def build_with_ctas(BUCKET_NAME: str, DATABASE_NAME: str, TABLE_NAME: str) -> No
     """
     wr.catalog.create_database(name=DATABASE_NAME, exist_ok=True)
     wr.catalog.delete_table_if_exists(database=DATABASE_NAME, table=TABLE_NAME)
+    wr.s3.delete_objects(f"s3://{BUCKET_NAME}/flights/gold/{TABLE_NAME}/")
     wr.athena.read_sql_query(
         query_ctas,
         database      = DATABASE_NAME,
