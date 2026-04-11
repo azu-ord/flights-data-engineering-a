@@ -175,6 +175,9 @@ if __name__ == "__main__":
 
         bucket_name = args.bucket
 
+        wr.catalog.create_database(name=DATABASE_NAME, exist_ok=True)
+        logger.info(f"Base de datos '{DATABASE_NAME}' lista en Glue Catalog.")
+
         df_bronze = reader(BUCKET_NAME=bucket_name, table="flights")
 
         df_daily = daily_transform(df_bronze)
