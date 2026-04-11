@@ -45,7 +45,7 @@ def build_with_ctas(BUCKET_NAME: str, DATABASE_NAME: str, TABLE_NAME: str) -> No
     """
     logger.info("── BUILDING GOLD TABLE WITH CTAS ──────────────────────────────────")
     query_ctas = f"""
-    CREATE TABLE flights_gold.vuelos_analitica AS (
+    CREATE TABLE {DATABASE_NAME}.{TABLE_NAME} AS (
         SELECT
             f.year,
             f.month,
@@ -76,12 +76,13 @@ def build_with_ctas(BUCKET_NAME: str, DATABASE_NAME: str, TABLE_NAME: str) -> No
             ON f.destination_airport = ap_dest.iata_code
     )
     """
-    wr.catalog.delete_table_if_exists(database=DATABASE_NAME, table=TABLE_NAME)
     wr.catalog.create_database(name=DATABASE_NAME, exist_ok=True)
+    wr.catalog.delete_table_if_exists(database=DATABASE_NAME, table=TABLE_NAME)
     wr.athena.read_sql_query(
         query_ctas,
         database      = DATABASE_NAME,
-        ctas_approach = False,  # No usar CTAS para evitar problemas de permisos y costos innecesarios
+        ctas_approach = False,
+        s3_output     = f"s3://{BUCKET_NAME}/athena-results/",
     )
     logger.info("✓ Gold table 'vuelos_analitica' creada con éxito.")
 
