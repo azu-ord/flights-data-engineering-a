@@ -1,3 +1,21 @@
+"""ETL Bronze Layer - Flights Dataset
+    # Descripción:
+    Este script realiza el proceso ETL para la capa Bronze del dataset de vuelos.
+- Extract: Lee los archivos CSV crudos (airlines.csv, airports.csv, flights.csv) desde un directorio local.
+- Validate: Verifica que las tablas pequeñas (airlines, airports) no estén vacías y que las columnas clave no tengan nulos. Para flights, la validación se hace chunk a chunk en load_large_table().
+- Load: Crea la base de datos 'flights_bronze' en Glue Catalog y escribe las tablas pequeñas a
+    S3 como Parquet. Para la tabla grande (flights), lee en chunks con dtype explícito y los sube a S3 como Parquet, registrándolos en Glue Catalog.
+# Uso:
+1. Asegúrate de tener AWS CLI configurado y las librerías necesarias instaladas (pandas, awswrangler).
+2. Ejecuta el script con los argumentos necesarios:
+   python etl/bronze.py --bucket <tu-bucket> --data-dir <ruta-al-directorio-de-csvs>
+   python etl/bronze.py --bucket <tu-bucket> --data-dir data/
+# Notas:
+- El script asume que los archivos CSV están en el formato esperado y que el bucket S3 existe y es accesible.
+- La tabla 'flights' se procesa en chunks para manejar su gran tamaño sin consumir demasiada memoria.
+    - Se definen tipos de datos explícitos para optimizar el uso de memoria y la compatibilidad con Athena.
+"""
+
 import argparse
 import logging
 import sys
