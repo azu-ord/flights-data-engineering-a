@@ -148,6 +148,13 @@ def writer(df: pd.DataFrame, BUCKET_NAME: str , DATABASE_NAME: str, TABLE_NAME: 
 # ──────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────
+
+def parse_args() -> argparse.Namespace:
+    """Parses command-line arguments."""
+    parser = argparse.ArgumentParser(description="ETL Silver Layer para datos de vuelos.")
+    parser.add_argument("--bucket", required=True, help="Nombre del bucket S3 donde se guardarán los datos transformados.")
+    return parser.parse_args()
+
 if __name__ == "__main__":
     args = parse_args()
     try:
