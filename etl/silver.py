@@ -1,5 +1,8 @@
 # etl/silver.py
 
+import os
+os.environ["WR_RAY_ENABLED"] = "0"
+
 import argparse
 import pandas as pd
 import awswrangler as wr
