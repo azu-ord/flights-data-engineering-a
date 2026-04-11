@@ -1,0 +1,12 @@
+# Demo 10: Data Engineering y Analítica
+# Instalar en SageMaker Studio con:
+#   %pip install -r requirements.txt
+
+# PostgreSQL driver
+psycopg2-binary>=2.9
+
+# ORM
+sqlalchemy>=2.0
+
+# AWS + pandas integration (Athena, S3, Glue)
+awswrangler>=3.0
