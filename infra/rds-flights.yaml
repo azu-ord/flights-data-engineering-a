@@ -25,7 +25,7 @@ Parameters:
   DBName:
     Type: String
     Description: Name of the initial database to create inside the RDS instance.
-    Default: northwind
+    Default: flights
 
   DBUsername:
     Type: String
@@ -45,8 +45,8 @@ Parameters:
     Type: String
     Description: >
       Secrets Manager secret name. Change this if you need to redeploy within
-      the 7-day recovery window of a previously deleted secret (e.g. itam/rds/northwind/credentials-v2).
-    Default: itam/rds/northwind/credentials
+      the 7-day recovery window of a previously deleted secret (e.g. itam/rds/flights/credentials-v2).
+    Default: itam/rds/flights/credentials
 
   CreateReadReplica:
     Type: String
@@ -141,7 +141,7 @@ Resources:
   # and free-tier eligible for the first 750 hours/month.
   #
   # AllocatedStorage: 20 GB gp2 — minimum for PostgreSQL on RDS; sufficient
-  # for the Northwind dataset used in class demos.
+  # for the flights dataset used in class demos.
   #
   # MultiAZ: false — single-AZ is fine for a course environment and avoids
   # doubling the hourly cost.
@@ -158,7 +158,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      DBInstanceIdentifier: !Sub 'itam-northwind-${AWS::AccountId}'
+      DBInstanceIdentifier: !Sub 'itam-flights-${AWS::AccountId}'
       DBInstanceClass: db.t3.micro
       Engine: postgres
       EngineVersion: '17.4'
@@ -166,7 +166,7 @@ Resources:
       MasterUsername: !Ref DBUsername
       MasterUserPassword: !Ref DBPassword
       AllocatedStorage: '20'
-      StorageType: gp2
+      StorageType: gp3
       MultiAZ: false
       PubliclyAccessible: true
       DBSubnetGroupName: !Ref RdsSubnetGroup
@@ -197,7 +197,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      DBInstanceIdentifier: !Sub 'itam-northwind-replica-${AWS::AccountId}'
+      DBInstanceIdentifier: !Sub 'itam-flights-replica-${AWS::AccountId}'
       DBInstanceClass: db.t3.micro
       SourceDBInstanceIdentifier: !Ref RdsInstance
       PubliclyAccessible: true
@@ -213,7 +213,7 @@ Outputs:
   RdsEndpoint:
     Description: >
       Hostname to use in the SQLAlchemy connection string.
-      Use this as RDS_ENDPOINT in northwind_etl.py.
+      Use this as RDS_ENDPOINT in gold.py.
     Value: !GetAtt RdsInstance.Endpoint.Address
 
   RdsPort:
