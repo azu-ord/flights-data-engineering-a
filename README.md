@@ -132,3 +132,26 @@ python etl/gold.py --bucket <tu-bucket>
 
 **Argumentos:**
 - `--bucket`: Nombre del bucket S3 donde están los datos Bronze
+
+---
+
+### 5. Notebook — Carga a RDS PostgreSQL
+
+`notebooks/sql_alchemy.ipynb` carga los datos de vuelos en una base de datos PostgreSQL en AWS RDS usando SQLAlchemy 2.0.
+
+**Descripción:**
+- Define el schema relacional de las tres tablas (`airlines`, `airports`, `flights`) con sus llaves primarias y foráneas
+- Conecta al endpoint primario de RDS obteniendo las credenciales desde AWS Secrets Manager (`itam/rds/flights/credentials`)
+- Inserta los datos desde CSV usando bulk insert, respetando el orden de dependencias FK
+- Incluye un ERD interactivo con las relaciones entre tablas
+- Verifica la carga consultando `information_schema` y conteos de filas por tabla
+
+**Tablas creadas en RDS:**
+- `airlines` — catálogo de aerolíneas (`iata_code` PK)
+- `airports` — catálogo de aeropuertos (`iata_code` PK, incluye coordenadas)
+- `flights` — vuelos con FK a `airlines` y `airports` (~500,000 registros)
+
+**Prerequisitos:**
+- Secret `itam/rds/flights/credentials` creado en AWS Secrets Manager con `dbname`, `username`, `password`, `port`
+- Stack de CloudFormation `infra/rds-flights.yaml` desplegado (RDS activo)
+- Archivos CSV en `data/flights/` (`airlines.csv`, `airports.csv`, `flights.csv`)
