@@ -168,7 +168,7 @@ if __name__ == "__main__":
         
         bucket_name = args.bucket
 
-        df_bronze = reader(BUCKET_NAME=bucket_name, table="flights_bronze")
+        df_bronze = reader(BUCKET_NAME=bucket_name, table="flights")
 
         df_daily = daily_transform(df_bronze)
         createCatalogTable(df_daily, TABLE_NAME=TABLE_NAME_DAILY, DATABASE_NAME=DATABASE_NAME)
