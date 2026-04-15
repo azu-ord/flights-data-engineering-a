@@ -155,3 +155,7 @@ python etl/gold.py --bucket <tu-bucket>
 - Secret `itam/rds/flights/credentials` creado en AWS Secrets Manager con `dbname`, `username`, `password`, `port`
 - Stack de CloudFormation `infra/rds-flights.yaml` desplegado (RDS activo)
 - Archivos CSV en `data/flights/` (`airlines.csv`, `airports.csv`, `flights.csv`)
+
+---
+### 6. Conexión con DBveaber y consultas con SQL
+
