@@ -157,5 +157,31 @@ python etl/gold.py --bucket <tu-bucket>
 - Archivos CSV en `data/flights/` (`airlines.csv`, `airports.csv`, `flights.csv`)
 
 ---
-### 6. Conexión con DBveaber y consultas con SQL
+
+### 6. Notebook — Análisis de Vuelos
+
+`notebooks/flights_analytics.ipynb` ejecuta 8 queries analíticas sobre los datos de vuelos conectándose a la **Read Replica** de RDS. Las queries de capa Silver se ejecutan directamente contra Athena.
+
+**Conexión:**
+- Usa SQLAlchemy + `pd.read_sql` apuntando al endpoint de la réplica de lectura
+- Las queries P4 y W2 usan `wr.athena.read_sql_query` contra `flights_silver`
+- Credenciales obtenidas desde Secrets Manager (`itam/rds/flights/credentials`)
+
+**Queries ejecutadas:**
+
+| ID | Pregunta | Fuente | Visualización |
+|---|---|---|---|
+| P1 | Top 10 rutas con mayor número de vuelos | RDS | Barras horizontales (Plotly) |
+| P2 | Top 5 aerolíneas con mayor % de cancelaciones | RDS | Barras (Plotly) |
+| P3 | Vuelos cancelados por causa (`cancellation_reason`) | RDS | Tabla formateada (great_tables) |
+| P4 | Retraso promedio de salida por mes (vuelos retrasados no cancelados) | Athena | Línea con área (Matplotlib) |
+| P5 | Top 10 aeropuertos con más minutos de retraso por clima | RDS | Barras horizontales (Plotly) |
+| W1 | Vuelo con mayor retraso de llegada por aerolínea — `RANK()` | RDS | Tabla con color (great_tables) |
+| W2 | Variación mes a mes en total de vuelos — `LAG()` | Athena | Línea + barras doble eje (Plotly) |
+| W3 | Primeros 5 vuelos desde LAX el 2015-01-01 — `ROW_NUMBER()` | RDS | Tabla con color (great_tables) |
+
+**Prerequisitos:**
+- Read Replica de RDS activa y accesible
+- Capas Bronze y Silver ejecutadas (para P4 y W2 vía Athena)
+- Librerías: `sqlalchemy`, `psycopg2`, `pandas`, `plotly`, `matplotlib`, `great_tables`, `awswrangler`
 
