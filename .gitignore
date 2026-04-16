@@ -1,0 +1,29 @@
+
+# Ignora la carpeta donde se  descomprime  el dataset
+data/
+# Prevenir carga de archivos
+*.zip
+*.csv
+*.parquet
+
+# Credenciales y entornos
+.env
+.aws/
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# Caché de compilaciones
+__pycache__/
+*.py[cod]
+*$py.class
+# Autoguardados de Jupyter Lab
+.ipynb_checkpoints/
+
+# Archivos de configuración de DBeaver o VSCode
+.dbeaver/
+.vscode/
+# Metadatos
+.DS_Store
+Thumbs.db
