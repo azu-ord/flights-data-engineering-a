@@ -200,21 +200,21 @@ python etl/gold.py --bucket <tu-bucket>
 
 **Consultas**
 
-- P1
+**P1**
 <img src="docs/7-query-P1.png" alt="7-query-P1" width="600">
-- P2
+**P2**
 <img src="docs/7-query-P2.png" alt="7-query-P2" width="600">
-- P3
+**P3**
 <img src="docs/7-query-P3.png" alt="7-query-P3" width="600">
-- P4
+**P4**
 <img src="docs/7-query-P4.png" alt="7-query-P4" width="600">
-- P5
+**P5**
 <img src="docs/7-query-P5.png" alt="7-query-P5" width="600">
-- W1
+**W1**
 <img src="docs/7-query-W1.png" alt="7-query-W1" width="600">
-- W2
+**W2**
 <img src="docs/7-query-W2.png" alt="7-query-W2" width="600">
-- W3
+**W3**
 <img src="docs/7-query-W3.png" alt="7-query-W3" width="600">
 
 
