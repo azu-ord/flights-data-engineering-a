@@ -67,6 +67,7 @@ python etl/bronze.py --bucket $S3_BUCKET --data-dir $DATA_DIR
 - Python 3.8+
 - Librerías: `pandas`, `awswrangler`
 
+<img src="docs/2.2-flights_bronze.png" alt="2.2-flights_bronze" width="600">
 ---
 
 ### 3. ETL - Capa Silver
@@ -91,6 +92,10 @@ python etl/silver.py --bucket <tu-bucket>
 
 **Argumentos:**
 - `--bucket`: Nombre del bucket S3 (puede incluir prefijo, ej. `mi-bucket/etl`)
+
+<img src="docs/2.3-glue_flights_silver.png" alt="2.3-glue_flights_silver" width="600">
+
+<img src="docs/2.3-glue_fligths_daily_silver.png" alt="2.3-glue_fligths_daily_silver" width="600">
 
 ---
 
@@ -133,6 +138,8 @@ python etl/gold.py --bucket <tu-bucket>
 **Argumentos:**
 - `--bucket`: Nombre del bucket S3 donde están los datos Bronze
 
+<img src="docs/2.4-athena_query_gold.png" alt="2.4-athena_query_gold" width="600">
+
 ---
 
 ### 5. Notebook — Carga a RDS PostgreSQL
@@ -156,9 +163,12 @@ python etl/gold.py --bucket <tu-bucket>
 - Stack de CloudFormation `infra/rds-flights.yaml` desplegado (RDS activo)
 - Archivos CSV en `data/flights/` (`airlines.csv`, `airports.csv`, `flights.csv`)
 
+<img src="docs/5.CloudFormation_output.png" alt="5.CloudFormation_output" width="600">
+<img src="docs/5.2-Diagrama-ER.png" alt="5.2-Diagrama-ER" width="600">
+
 ---
 
-### 6. Notebook — Análisis de Vuelos
+### 6,7. Notebook — Análisis de Vuelos
 
 `notebooks/flights_analytics.ipynb` ejecuta 8 queries analíticas sobre los datos de vuelos conectándose a la **Read Replica** de RDS. Las queries de capa Silver se ejecutan directamente contra Athena.
 
@@ -184,4 +194,94 @@ python etl/gold.py --bucket <tu-bucket>
 - Read Replica de RDS activa y accesible
 - Capas Bronze y Silver ejecutadas (para P4 y W2 vía Athena)
 - Librerías: `sqlalchemy`, `psycopg2`, `pandas`, `plotly`, `matplotlib`, `great_tables`, `awswrangler`
+
+<img src="docs/6.-DBeaverConnectionTest.png" alt="6.-DBeaverConnectionTest" width="600">
+<img src="docs/6.1-DBeaver_arbol_esquemas.png" alt="6.1-DBeaver_arbol_esquemas" width="600">
+
+**Consultas**
+
+- P1
+<img src="docs/7-query-P1.png" alt="7-query-P1" width="600">
+- P2
+<img src="docs/7-query-P2.png" alt="7-query-P2" width="600">
+- P3
+<img src="docs/7-query-P3.png" alt="7-query-P3" width="600">
+- P4
+<img src="docs/7-query-P4.png" alt="7-query-P4" width="600">
+- P5
+<img src="docs/7-query-P5.png" alt="7-query-P5" width="600">
+- W1
+<img src="docs/7-query-W1.png" alt="7-query-W1" width="600">
+- W2
+<img src="docs/7-query-W2.png" alt="7-query-W2" width="600">
+- W3
+<img src="docs/7-query-W3.png" alt="7-query-W3" width="600">
+
+
+---
+
+### 8. Notebook — Análisis Estadístico
+
+`notebooks/flights_analytics.ipynb` implementa dos análisis estadísticos sobre los datos de vuelos: una regresión lineal para identificar los factores que explican el retraso de llegada, y un pronóstico de series de tiempo para estimar la demanda mensual de vuelos.
+
+---
+
+#### 8.1 Regresión Lineal — ¿Qué factores explican el retraso de llegada?
+
+**Descripción:**
+- Lee 500,000 observaciones aleatorias desde `flights_gold.vuelos_analitica` en Athena
+- Ajusta un modelo OLS con `statsmodels` usando `arrival_delay` como variable objetivo
+
+**Variable objetivo y features:**
+
+| Variable | Rol |
+|---|---|
+| `arrival_delay` | Variable objetivo `y` |
+| `departure_delay`, `distance` | Features independientes |
+| `air_system_delay`, `airline_delay`, `weather_delay`, `late_aircraft_delay`, `security_delay` | Componentes de retraso |
+
+**Métricas reportadas:**
+- **R²** — 0.9418
+- **RMSE** — 9.46 minutos
+
+**Visualizaciones generadas:**
+
+- Coeficientes con intervalos de confianza al 95%
+- Valores predichos `ŷ` vs. valores reales `y`
+- Residuos vs. valores predichos
+- Q-Q plot de residuos — diagnóstico de normalidad |
+
+**Prerequisitos:**
+- Capa Gold ejecutada (`flights_gold.vuelos_analitica` disponible en Athena)
+- Librerías: `statsmodels`, `scikit-learn`, `matplotlib`, `awswrangler`
+
+---
+
+#### 8.2 Pronóstico de Series de Tiempo — ¿Cuántos vuelos habrá en los próximos meses?
+
+**Descripción:**
+- Lee el total mensual de vuelos desde `flights_silver.flights_monthly` en Athena
+- Construye una serie de tiempo en formato StatsForecast (`unique_id`, `ds`, `y`)
+- Divide en train (ene–sep 2015, 9 meses) y test (oct–dic 2015, 3 meses)
+- Ajusta tres modelos automáticos y pronostica 9 pasos: 3 sobre el test set y 6 hacia 2016
+
+**Modelos ajustados:**
+
+| Modelo | Especificación seleccionada | MAE test set |
+|---|---|---|
+| AutoARIMA | ARIMA(0,0,0) | ~9,512 vuelos/mes * mejor |
+| AutoETS | ETS(A,N,N) | ~9,530 vuelos/mes |
+| AutoTheta | OTM | ~18,735 vuelos/mes |
+
+> Con 9 puntos de entrenamiento los tres modelos generan el mismo promedio para los próximos meses, con tan pocos datos no se captura la estacionalidad.
+
+**Visualizaciones generadas:**
+
+Pronóstico vs. valores reales en test set con bandas CI 90%
+Pronóstico ene–jun 2016 con bandas CI 90%
+Comparación de MAE por modelo en el test set
+
+**Prerequisitos:**
+- Capa Silver ejecutada (`flights_silver.flights_monthly` disponible en Athena)
+- Librerías: `statsforecast`, `scikit-learn`, `matplotlib`, `awswrangler`
 
